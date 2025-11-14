@@ -12,3 +12,12 @@ pub struct Lottery {
     pub winner_chosen: bool,
     pub bump: u8,
 }
+
+#[account]
+#[derive(InitSpace)]
+pub struct Entry {
+    pub owner: Pubkey,
+    pub lottery: Pubkey,
+    pub entry_id: u64,
+    pub bump: u8,
+}

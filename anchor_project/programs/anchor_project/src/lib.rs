@@ -18,4 +18,8 @@ pub mod anchor_project {
     ) -> Result<()> {
         initialize_lottery(ctx, lottery_id, entry_price, max_entries)
     }
+
+    pub fn enter_lottery(ctx: Context<EnterLottery>) -> Result<()> {
+        enter_lottery(ctx)
+    }
 }
