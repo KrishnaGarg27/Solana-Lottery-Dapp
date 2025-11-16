@@ -12,4 +12,12 @@ pub enum LotteryErrors {
     MaxEntriesReached,
     #[msg("Winner has already been chosen")]
     WinnerChosen,
+    #[msg("No entries to choose from")]
+    NoEntries,
+    #[msg("Winner has not been chosen")]
+    WinnerNotChosen,
+    #[msg("The instruction does not match the Lottery Winner")]
+    WinnerMismatch,
+    #[msg("Prize has already been claimed")]
+    PrizeClaimed,
 }

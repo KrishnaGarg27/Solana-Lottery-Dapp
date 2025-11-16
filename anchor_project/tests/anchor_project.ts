@@ -60,7 +60,7 @@ describe("anchor_project", () => {
       .signers([creatorAlice])
       .rpc({ commitment: "confirmed" });
 
-    checkLottery(
+    await checkLottery(
       program,
       lotteryPdaAlice,
       prizeVaultPdaAlice,
@@ -146,11 +146,14 @@ describe("anchor_project", () => {
 
   it("Bob enters Alice's Lottery successfully", async () => {
     const lotteryData = await program.account.lottery.fetch(lotteryPdaAlice);
+    const initialPrizeVaultLamports = (
+      await program.provider.connection.getAccountInfo(prizeVaultPdaAlice)
+    ).lamports;
+
     const [entryPda] = anchor.web3.PublicKey.findProgramAddressSync(
       [
         Buffer.from("entry"),
         lotteryPdaAlice.toBuffer(),
-        creatorBob.publicKey.toBuffer(),
         lotteryData.totalEntries.toArrayLike(Buffer, "le", 8),
       ],
       program.programId
@@ -184,6 +187,31 @@ describe("anchor_project", () => {
       entryData.entryId.eq(lotteryData.totalEntries),
       "Entry ids do not match"
     );
+
+    const entryPrice = new anchor.BN(1 * anchor.web3.LAMPORTS_PER_SOL);
+    const maxEntries = new anchor.BN(1000);
+    const totalEntries = new anchor.BN(1);
+
+    await checkLottery(
+      program,
+      lotteryPdaAlice,
+      prizeVaultPdaAlice,
+      creatorAlice.publicKey,
+      "Alice",
+      lotteryIdAlice,
+      entryPrice,
+      maxEntries,
+      totalEntries
+    );
+
+    const finalPrizeVaultLamports = (
+      await program.provider.connection.getAccountInfo(prizeVaultPdaAlice)
+    ).lamports;
+    assert.strictEqual(
+      finalPrizeVaultLamports - initialPrizeVaultLamports,
+      Number(entryPrice),
+      "The Prize Vault lamports did not increase by entry price amount"
+    );
   });
 
   it("Bob fails to enter Anatoly's lottery more than maximum number of times", async () => {
@@ -201,20 +229,20 @@ describe("anchor_project", () => {
       .signers([creatorAnatoly])
       .rpc({ commitment: "confirmed" });
 
+    const initialPrizeVaultLamports = (
+      await program.provider.connection.getAccountInfo(prizeVaultPdaAnatoly)
+    ).lamports;
+
     let testFailed = false;
     let i;
 
     try {
       for (i = 0; i <= 10; i++) {
-        const lotteryData = await program.account.lottery.fetch(
-          lotteryPdaAnatoly
-        );
         const [entryPda] = anchor.web3.PublicKey.findProgramAddressSync(
           [
             Buffer.from("entry"),
             lotteryPdaAnatoly.toBuffer(),
-            creatorBob.publicKey.toBuffer(),
-            lotteryData.totalEntries.toArrayLike(Buffer, "le", 8),
+            new anchor.BN(i).toArrayLike(Buffer, "le", 8),
           ],
           program.programId
         );
@@ -233,11 +261,31 @@ describe("anchor_project", () => {
       }
     } catch (error) {
       const err = anchor.AnchorError.parse(error.logs);
+      const totalEntries = new anchor.BN(10);
+      const finalPrizeVaultLamports = (
+        await program.provider.connection.getAccountInfo(prizeVaultPdaAnatoly)
+      ).lamports;
       assert.strictEqual(i, 10, "Bob should have been able to make 10 entries");
       assert.strictEqual(
         err.error.errorCode.code,
         "MaxEntriesReached",
         "Expected error 'Max Entries Reached'"
+      );
+      await checkLottery(
+        program,
+        lotteryPdaAnatoly,
+        prizeVaultPdaAnatoly,
+        creatorAnatoly.publicKey,
+        "Anatoly",
+        lotteryIdAnatoly,
+        entryPrice,
+        maxEntries,
+        totalEntries
+      );
+      assert.strictEqual(
+        finalPrizeVaultLamports - initialPrizeVaultLamports,
+        Number(totalEntries.mul(entryPrice)),
+        "The Prize Vault did not increase by the actual entry price for 10 entries"
       );
       testFailed = true;
     }
@@ -246,6 +294,173 @@ describe("anchor_project", () => {
       testFailed,
       true,
       "Bob should have failed to make more than the maximum number of entries"
+    );
+  });
+
+  it("Alice picks winner of her lottery", async () => {
+    const tx = await program.methods
+      .pickWinner(lotteryIdAlice)
+      .accounts({
+        creator: creatorAlice.publicKey,
+        lottery: lotteryPdaAlice,
+      })
+      .signers([creatorAlice])
+      .rpc({ commitment: "confirmed" });
+
+    const lotteryData = await program.account.lottery.fetch(lotteryPdaAlice);
+
+    assert(lotteryData.winner !== null, "Alice's lottery should have a winner");
+
+    const winnerEntryPda = lotteryData.winner;
+    const winnerData = await program.account.entry.fetch(winnerEntryPda);
+
+    assert.strictEqual(
+      winnerData.owner.toString(),
+      creatorBob.publicKey.toString(),
+      "Winner of Alice's Lottery should be Bob"
+    );
+  });
+
+  it("Alice fails to pick winner of her lottery again", async () => {
+    let test_failed = false;
+    try {
+      const tx = await program.methods
+        .pickWinner(lotteryIdAlice)
+        .accounts({
+          creator: creatorAlice.publicKey,
+          lottery: lotteryPdaAlice,
+        })
+        .signers([creatorAlice])
+        .rpc({ commitment: "confirmed" });
+    } catch (error) {
+      const err = anchor.AnchorError.parse(error.logs);
+      assert.strictEqual(
+        err.error.errorCode.code,
+        "WinnerChosen",
+        "Expected error - Winner already Chosen"
+      );
+      test_failed = true;
+    }
+
+    assert.strictEqual(
+      test_failed,
+      true,
+      "Alice should have failed to choose the winner again"
+    );
+  });
+
+  it("Bob successfully claims the prize of Alice's lottery", async () => {
+    const lotteryData = await program.account.lottery.fetch(lotteryPdaAlice);
+
+    const initialPrizeVaultLamports = (
+      await program.provider.connection.getAccountInfo(prizeVaultPdaAlice)
+    ).lamports;
+    const initialUserLamports = (
+      await program.provider.connection.getAccountInfo(creatorBob.publicKey)
+    ).lamports;
+
+    const tx = await program.methods
+      .claimPrize()
+      .accounts({
+        signer: creatorBob.publicKey,
+        winnerEntry: lotteryData.winner,
+        lottery: lotteryPdaAlice,
+        prizeVault: prizeVaultPdaAlice,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([creatorBob])
+      .rpc({ commitment: "confirmed" });
+
+    const finalPrizeVaultLamports = (
+      await program.provider.connection.getAccountInfo(prizeVaultPdaAlice)
+    ).lamports;
+    const finalUserLamports = (
+      await program.provider.connection.getAccountInfo(creatorBob.publicKey)
+    ).lamports;
+
+    assert.strictEqual(
+      initialPrizeVaultLamports - finalPrizeVaultLamports,
+      Number(lotteryData.prizePot),
+      "The Prize Vault lamports should decrease by the prize pot amount"
+    );
+    assert.strictEqual(
+      finalUserLamports - initialUserLamports,
+      Number(lotteryData.prizePot),
+      "The user lamports should increase by the prize pot amount"
+    );
+  });
+
+  it("Bob cannot claim the prize of Alice's lottery twice", async () => {
+    const lotteryData = await program.account.lottery.fetch(lotteryPdaAlice);
+    let test_failed = false;
+
+    try {
+      const tx = await program.methods
+        .claimPrize()
+        .accounts({
+          signer: creatorBob.publicKey,
+          winnerEntry: lotteryData.winner,
+          lottery: lotteryPdaAlice,
+          prizeVault: prizeVaultPdaAlice,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([creatorBob])
+        .rpc({ commitment: "confirmed" });
+    } catch (error) {
+      const err = anchor.AnchorError.parse(error.logs);
+      assert.strictEqual(
+        err.error.errorCode.code,
+        "PrizeClaimed",
+        "Expected error - Prize has already been claimed"
+      );
+      test_failed = true;
+    }
+
+    assert.strictEqual(
+      test_failed,
+      true,
+      "Bob should have failed to claim the prize twice"
+    );
+  });
+
+  it("Alice cannot claim the prize of Anatoly's lottery", async () => {
+    await program.methods
+      .pickWinner(lotteryIdAnatoly)
+      .accounts({
+        creator: creatorAnatoly.publicKey,
+        lottery: lotteryPdaAnatoly,
+      })
+      .signers([creatorAnatoly])
+      .rpc({ commitment: "confirmed" });
+
+    const lotteryData = await program.account.lottery.fetch(lotteryPdaAnatoly);
+    let test_failed = false;
+
+    try {
+      const tx = await program.methods
+        .claimPrize()
+        .accounts({
+          signer: creatorAlice.publicKey,
+          winnerEntry: lotteryData.winner,
+          lottery: lotteryPdaAnatoly,
+          prizeVault: prizeVaultPdaAnatoly,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([creatorAlice])
+        .rpc({ commitment: "confirmed" });
+    } catch (error) {
+      const err = anchor.AnchorError.parse(error.logs);
+      assert.strictEqual(
+        err.error.errorCode.code,
+        "WinnerMismatch",
+        "Expected error - Winner does not match Alice"
+      );
+      test_failed = true;
+    }
+    assert.strictEqual(
+      test_failed,
+      true,
+      "Alice should not be able to claim Anatoly's lottery prize as winner has not been chosen"
     );
   });
 });
@@ -269,7 +484,8 @@ async function checkLottery(
   creatorName: string,
   lotteryId: number,
   entryPrice: anchor.BN,
-  maxEntries: anchor.BN
+  maxEntries: anchor.BN,
+  totalEntries: anchor.BN = new anchor.BN(0)
 ) {
   const lotteryData = await program.account.lottery.fetch(lotteryPda);
 
@@ -292,32 +508,26 @@ async function checkLottery(
   );
 
   assert.strictEqual(
-    lotteryData.prizePot,
-    new anchor.BN(0),
-    "Prize pot should be zero initially"
+    lotteryData.prizePot.toString(),
+    totalEntries.mul(entryPrice).toString(),
+    `Prize pot should be ${totalEntries.mul(entryPrice)}`
   );
 
   assert.strictEqual(
-    lotteryData.entryPrice,
-    entryPrice,
+    lotteryData.entryPrice.toString(),
+    entryPrice.toString(),
     "Entry Prices do not match"
   );
 
   assert.strictEqual(
-    lotteryData.maxEntries,
-    maxEntries,
+    lotteryData.maxEntries.toString(),
+    maxEntries.toString(),
     "Max entries do not match"
   );
 
   assert.strictEqual(
-    lotteryData.totalEntries,
-    new anchor.BN(0),
-    "Total entries should be zero initially"
-  );
-
-  assert.strictEqual(
-    lotteryData.winnerChosen,
-    false,
-    "Winner chosen should be false initially"
+    lotteryData.totalEntries.toString(),
+    totalEntries.toString(),
+    `Total entries should be ${totalEntries}`
   );
 }

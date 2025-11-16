@@ -14,7 +14,7 @@ pub fn _enter_lottery(ctx: Context<EnterLottery>) -> Result<()> {
         lottery.total_entries < lottery.max_entries,
         LotteryErrors::MaxEntriesReached
     );
-    require!(!lottery.winner_chosen, LotteryErrors::WinnerChosen);
+    require!(lottery.winner.is_none(), LotteryErrors::WinnerChosen);
     require!(
         lottery.entry_price <= owner.to_account_info().lamports(),
         LotteryErrors::InsufficientBalance
@@ -50,7 +50,7 @@ pub struct EnterLottery<'info> {
         init,
         payer = owner,
         space = 8 + Entry::INIT_SPACE,
-        seeds = [b"entry", lottery.key().as_ref(), owner.key().as_ref(), lottery.total_entries.to_le_bytes().as_ref()],
+        seeds = [b"entry", lottery.key().as_ref(), lottery.total_entries.to_le_bytes().as_ref()],
         bump
     )]
     pub entry: Account<'info, Entry>,

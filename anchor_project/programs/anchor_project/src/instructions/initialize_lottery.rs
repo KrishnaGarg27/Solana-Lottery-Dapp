@@ -22,7 +22,7 @@ pub fn _initialize_lottery(
     lottery.entry_price = entry_price;
     lottery.max_entries = max_entries;
     lottery.total_entries = 0;
-    lottery.winner_chosen = false;
+    lottery.winner = None;
     lottery.bump = ctx.bumps.lottery;
 
     Ok(())

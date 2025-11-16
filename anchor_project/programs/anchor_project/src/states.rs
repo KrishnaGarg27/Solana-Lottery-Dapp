@@ -10,7 +10,7 @@ pub struct Lottery {
     pub entry_price: u64,
     pub max_entries: u64,
     pub total_entries: u64,
-    pub winner_chosen: bool,
+    pub winner: Option<Pubkey>,
     pub bump: u8,
 }
 

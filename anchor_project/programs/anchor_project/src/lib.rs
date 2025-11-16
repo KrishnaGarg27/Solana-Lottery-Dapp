@@ -24,7 +24,11 @@ pub mod anchor_project {
         _enter_lottery(ctx)
     }
 
-    pub fn pick_winner(ctx: Context<PickWinner>) -> Result<()> {
-        _pick_winner(ctx)
+    pub fn pick_winner(ctx: Context<PickWinner>, lottery_id: u8) -> Result<()> {
+        _pick_winner(ctx, lottery_id)
+    }
+
+    pub fn claim_prize(ctx: Context<ClaimPrize>) -> Result<()> {
+        _claim_prize(ctx)
     }
 }
