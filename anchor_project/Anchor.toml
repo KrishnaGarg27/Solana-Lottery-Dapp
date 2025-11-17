@@ -5,14 +5,17 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
+[programs.devnet]
+anchor_project = "GCoAnH3cGsUAz9vFChaujX9LpBien56N7PTaDuvgHex7"
+
 [programs.localnet]
-anchor_project = "DqKkMRaPxD9H6RHucpzjDgwj7FUZXKJXb7xx778TnSM8"
+anchor_project = "GCoAnH3cGsUAz9vFChaujX9LpBien56N7PTaDuvgHex7"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

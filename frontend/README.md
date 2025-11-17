@@ -1,4 +1,4 @@
-# lottery-onchain
+# frontend
 
 This is a Vite app containing:
 
@@ -14,7 +14,7 @@ This is a Vite app containing:
 #### Download the template
 
 ```shell
-pnpm create solana-dapp@latest -t gh:solana-foundation/templates/web3js/lottery-onchain
+pnpm create solana-dapp@latest -t gh:solana-foundation/templates/web3js/frontend
 ```
 
 #### Install Dependencies

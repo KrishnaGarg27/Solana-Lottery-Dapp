@@ -1,5 +1,5 @@
 {
-  "name": "lottery-onchain",
+  "name": "frontend",
   "scripts": {
     "anchor": "cd anchor && anchor",
     "anchor-build": "cd anchor && anchor build",
