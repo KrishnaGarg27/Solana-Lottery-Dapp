@@ -12,16 +12,12 @@ A simple decentralized lottery application built on Solana. Anyone can connect t
 
 ### Key Features
 
-[TODO: List the main features of your dApp. Be specific about what users can do.]
-
 - Feature 1: Anyone can create a lottery.
 - Feature 2: Anyone can participate.
 - Feature 2: The creator can pick a random winner.
 - Feature 2: Winners can claim their prizes
 
 ### How to Use the dApp
-
-[TODO: Provide step-by-step instructions for users to interact with your dApp]
 
 1. **Connect Wallet**
 2. **Create Lottery:** Fill the lottery creation form and create a new lottery. The inputs are checked for validity and appropriate errors are displayed otherwise. Lottery IDs should be unique for a wallet and between 0 and 255, entry price and max entries cannot be 0.
@@ -36,7 +32,6 @@ There are four instructions - to initialize a lottery, to enter into a lottery, 
 
 ### PDA Usage
 
-[TODO: Explain how you implemented Program Derived Addresses (PDAs) in your project. What seeds do you use and why?]
 The project uses PDAs for all the three accounts - lottery account, entry account and prize vault account. The lottery account seeds use the creator's pubkey and the lottery id. The prize vault uses the lottery PDA as a seed. The entry account uses the lottery PDA and the entry number as seeds.
 
 **PDAs Used:**
@@ -55,8 +50,6 @@ The project uses PDAs for all the three accounts - lottery account, entry accoun
 - **Claim Prize**: Transfers prize from prize vault to user account if they have won the lottery
 
 ### Account Structure
-
-[TODO: Describe your main account structures and their purposes]
 
 ```rust
 #[account]
